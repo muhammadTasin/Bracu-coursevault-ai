@@ -21,6 +21,14 @@ const aiResponseSchema = z.object({
 
 type AIResponse = z.infer<typeof aiResponseSchema>;
 
+// Safe failover models list from major providers
+const OPENROUTER_MODELS = [
+  "google/gemini-2.5-flash",
+  "openai/gpt-4o-mini",
+  "anthropic/claude-3-haiku",
+  "qwen/qwen-2.5-72b-instruct"
+];
+
 export async function POST(request: Request) {
   try {
     // 1. Session verification check
@@ -74,7 +82,7 @@ Important Rules:
 - Do not return empty fields. Generate realistic study resource URLs referencing GitHub, YouTube, or PDF tutorial sites related to the course.
 `;
 
-    // 4. Try Gemini Primary
+    // 4. Try Gemini Primary (Max 3.5s timeout)
     if (process.env.GEMINI_API_KEY) {
       try {
         console.log("Calling primary Gemini AI Engine...");
@@ -84,16 +92,24 @@ Important Rules:
           generationConfig: { responseMimeType: "application/json" }
         });
 
-        const result = await model.generateContent(prompt);
+        // 3.5 second timeout wrapper to prevent serverless function hang
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Gemini API call timed out")), 3500)
+        );
+
+        const result = await Promise.race([
+          model.generateContent(prompt),
+          timeoutPromise
+        ]);
+
         const responseText = result.response.text();
         const cleanedText = cleanJsonText(responseText);
         const parsed = JSON.parse(cleanedText);
-
-        // Validate structure with Zod
         const validated = aiResponseSchema.parse(parsed);
+
         return NextResponse.json({
           success: true,
-          provider: "Gemini",
+          provider: "Gemini (Primary)",
           data: validated
         });
       } catch (geminiError) {
@@ -101,52 +117,53 @@ Important Rules:
       }
     }
 
-    // 5. Try OpenRouter Fallback
+    // 5. Try OpenRouter Fallbacks (Loop through models with low 2.5s timeouts)
     if (process.env.OPENROUTER_API_KEY) {
-      try {
-        console.log("Calling fallback OpenRouter AI Engine...");
-        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://coursevault-ai.vercel.app",
-            "X-Title": "CourseVault AI"
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash", // Cost-effective model on OpenRouter
-            messages: [
-              { role: "user", content: prompt }
-            ],
-            response_format: { type: "json_object" }
-          }),
-          // 8 second timeout
-          signal: AbortSignal.timeout(8000)
-        });
+      console.log("Entering OpenRouter Failover Chain...");
+      for (const openRouterModel of OPENROUTER_MODELS) {
+        try {
+          console.log(`Trying OpenRouter model: ${openRouterModel}...`);
+          const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://coursevault-ai.vercel.app",
+              "X-Title": "CourseVault AI"
+            },
+            body: JSON.stringify({
+              model: openRouterModel,
+              messages: [{ role: "user", content: prompt }],
+              response_format: { type: "json_object" }
+            }),
+            // 2.5 seconds timeout per model to stay well within serverless gateway limit
+            signal: AbortSignal.timeout(2500)
+          });
 
-        if (response.ok) {
-          const resJson = await response.json();
-          const responseText = resJson.choices?.[0]?.message?.content;
-          if (responseText) {
-            const cleanedText = cleanJsonText(responseText);
-            const parsed = JSON.parse(cleanedText);
-            const validated = aiResponseSchema.parse(parsed);
-            
-            return NextResponse.json({
-              success: true,
-              provider: "OpenRouter",
-              data: validated
-            });
+          if (response.ok) {
+            const resJson = await response.json();
+            const responseText = resJson.choices?.[0]?.message?.content;
+            if (responseText) {
+              const cleanedText = cleanJsonText(responseText);
+              const parsed = JSON.parse(cleanedText);
+              const validated = aiResponseSchema.parse(parsed);
+              
+              return NextResponse.json({
+                success: true,
+                provider: `OpenRouter (${openRouterModel})`,
+                data: validated
+              });
+            }
+          } else {
+            console.warn(`OpenRouter model ${openRouterModel} returned error: ${response.status}`);
           }
-        } else {
-          console.warn("OpenRouter API returned error status:", response.status);
+        } catch (openRouterError) {
+          console.error(`OpenRouter model ${openRouterModel} failed:`, openRouterError instanceof Error ? openRouterError.message : openRouterError);
         }
-      } catch (openRouterError) {
-        console.error("OpenRouter fallback failure:", openRouterError instanceof Error ? openRouterError.message : openRouterError);
       }
     }
 
-    // 6. Safe Local Fallback Rule Engine (If both APIs fail or are missing keys)
+    // 6. Safe Local Fallback Rule Engine (If both APIs fail, time out, or are missing keys)
     console.warn("AI providers unreachable. Triggering static local database fallback...");
     const localResult = getLocalSuggestion(normalizedQuery);
     const validated = aiResponseSchema.parse(localResult);

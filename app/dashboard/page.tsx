@@ -69,6 +69,16 @@ export default function Dashboard() {
         },
         body: JSON.stringify({ query: courseCode }),
       });
+      
+      if (!res.ok) {
+        throw new Error(`Server returned error status ${res.status}`);
+      }
+
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Server returned non-JSON response.");
+      }
+
       const data = await res.json();
       if (data.success && data.data) {
         setCourseCode(data.data.courseCode || courseCode);
