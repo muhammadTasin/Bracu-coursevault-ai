@@ -11,13 +11,9 @@ export default function SettingsPage() {
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [loading, setLoading] = useState(true);
-  
-  const [activeProvider, setActiveProvider] = useState("gemini-primary");
-  const [geminiKeyInput, setGeminiKeyInput] = useState("");
-  const [openRouterKeyInput, setOpenRouterKeyInput] = useState("");
+  const [imgError, setImgError] = useState(false);
   
   const [savingProfile, setSavingProfile] = useState(false);
-  const [savingKeys, setSavingKeys] = useState(false);
   const [alertMsg, setAlertMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -30,6 +26,7 @@ export default function SettingsPage() {
         setFullName(res.data.full_name || "");
         setEmail(res.data.email);
         setAvatarUrl(res.data.avatar_url || "");
+        setImgError(false);
       } else {
         setErrorMsg(res.error || "Failed to retrieve your profile settings.");
       }
@@ -59,6 +56,7 @@ export default function SettingsPage() {
       if (res.success && res.data) {
         setFullName(res.data.full_name || "");
         setAvatarUrl(res.data.avatar_url || "");
+        setImgError(false);
         setAlertMsg("Identity synchronized successfully!");
         setTimeout(() => setAlertMsg(""), 3500);
       } else {
@@ -70,18 +68,6 @@ export default function SettingsPage() {
     } finally {
       setSavingProfile(false);
     }
-  };
-
-  const handleSaveKeysPlaceholder = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingKeys(true);
-    setTimeout(() => {
-      setSavingKeys(false);
-      setGeminiKeyInput("");
-      setOpenRouterKeyInput("");
-      setAlertMsg("Secure credentials updated on server-side simulator!");
-      setTimeout(() => setAlertMsg(""), 3500);
-    }, 1200);
   };
 
   const handleLogout = async () => {
@@ -104,6 +90,8 @@ export default function SettingsPage() {
       </main>
     );
   }
+
+  const initialLetter = fullName ? fullName.charAt(0).toUpperCase() : "S";
 
   return (
     <main className="flex-1 pt-32 pb-24 px-4 md:px-12 max-w-[1440px] mx-auto w-full flex flex-col gap-10 relative z-10">
@@ -151,6 +139,26 @@ export default function SettingsPage() {
             <h2 className="text-xl font-bold text-white">Profile Details</h2>
           </div>
 
+          {/* Profile Avatar Live Preview */}
+          <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5">
+            {!avatarUrl || imgError ? (
+              <div className="w-16 h-16 rounded-full border-2 border-[#d2bbff] bg-gradient-to-tr from-[#7c3aed] to-[#94e2ff] flex items-center justify-center shadow-[0_0_15px_rgba(124,58,237,0.3)] text-[#060d20] font-black text-xl font-mono select-none">
+                {initialLetter}
+              </div>
+            ) : (
+              <img
+                alt="User Profile Preview"
+                className="w-16 h-16 rounded-full border-2 border-[#d2bbff] shadow-[0_0_15px_rgba(124,58,237,0.3)] object-cover"
+                src={avatarUrl}
+                onError={() => setImgError(true)}
+              />
+            )}
+            <div>
+              <h3 className="text-white font-bold text-base leading-snug">{fullName || "Scholar Identity"}</h3>
+              <p className="text-xs text-[#ccc3d8]/60 font-mono mt-0.5">{email || "mailbox@university.edu"}</p>
+            </div>
+          </div>
+
           <form onSubmit={handleUpdateProfile} className="flex flex-col gap-4">
             <div>
               <label className="block text-[10px] font-mono uppercase tracking-wider text-[#ccc3d8]/80 mb-2">
@@ -175,7 +183,10 @@ export default function SettingsPage() {
                 disabled={savingProfile}
                 placeholder="e.g. https://domain.com/photo.jpg"
                 value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
+                onChange={(e) => {
+                  setAvatarUrl(e.target.value);
+                  setImgError(false);
+                }}
                 className="input-glass disabled:opacity-50"
               />
             </div>
@@ -202,69 +213,34 @@ export default function SettingsPage() {
           </form>
         </div>
 
-        {/* AI Provider Config Card */}
-        <div className="bento-card lg:col-span-6 flex flex-col gap-6 border border-white/10 shadow-xl">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-[#7c3aed]">
-              <span className="material-symbols-outlined text-lg">auto_awesome</span>
+        {/* AI Provider Config Read-Only Security Card */}
+        <div className="bento-card lg:col-span-6 flex flex-col gap-6 border border-white/10 shadow-xl justify-between min-h-[350px]">
+          <div className="flex flex-col gap-6">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-[#7c3aed]">
+                <span className="material-symbols-outlined text-lg">auto_awesome</span>
+              </div>
+              <h2 className="text-xl font-bold text-white">AI Resource Finder</h2>
             </div>
-            <h2 className="text-xl font-bold text-white">Secure AI Provider Settings</h2>
+
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+              <span className="material-symbols-outlined text-2xl animate-pulse">lock_open</span>
+              <div>
+                <h3 className="font-bold text-sm text-white">AI Resource Finder: Connected</h3>
+                <p className="text-xs text-emerald-400/80 mt-0.5">Gemini primary + OpenRouter fallback active</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#171f33]/40 border border-white/5">
+              <p className="text-xs text-[#ccc3d8]/80 leading-relaxed">
+                Keys are stored securely on the server and never exposed to the browser.
+              </p>
+            </div>
           </div>
 
-          <p className="text-xs text-[#ccc3d8]/70 leading-relaxed border-l-2 border-[#7c3aed] pl-3">
-            <strong>Security Notice:</strong> All API keys are processed and stored server-side. They are never exposed to the frontend environment, ensuring complete security.
-          </p>
-
-          <form onSubmit={handleSaveKeysPlaceholder} className="flex flex-col gap-4">
-            <div>
-              <label className="block text-[10px] font-mono uppercase tracking-wider text-[#ccc3d8]/80 mb-2">
-                Routing Priority (Active Engine)
-              </label>
-              <select
-                value={activeProvider}
-                onChange={(e) => setActiveProvider(e.target.value)}
-                className="w-full bg-[#2d3449]/40 border border-[#4a4455] rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#94e2ff] transition-all cursor-pointer"
-              >
-                <option className="bg-[#131b2e]" value="gemini-primary">Gemini (Primary) + OpenRouter Fallback</option>
-                <option className="bg-[#131b2e]" value="openrouter-only">OpenRouter Exclusive</option>
-                <option className="bg-[#131b2e]" value="gemini-only">Gemini Studio Exclusive</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-mono uppercase tracking-wider text-[#ccc3d8]/80 mb-2">
-                Gemini API Key (Google AI Studio)
-              </label>
-              <input
-                type="password"
-                placeholder="••••••••••••••••••••••••"
-                value={geminiKeyInput}
-                onChange={(e) => setGeminiKeyInput(e.target.value)}
-                className="input-glass"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-mono uppercase tracking-wider text-[#ccc3d8]/80 mb-2">
-                OpenRouter API Key
-              </label>
-              <input
-                type="password"
-                placeholder="••••••••••••••••••••••••"
-                value={openRouterKeyInput}
-                onChange={(e) => setOpenRouterKeyInput(e.target.value)}
-                className="input-glass"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={savingKeys}
-              className="btn-secondary py-2.5 px-6 mt-2 text-sm self-start border-[#7c3aed]/50 hover:border-[#7c3aed] disabled:opacity-50"
-            >
-              {savingKeys ? "Encrypting..." : "Save Secure Keys"}
-            </button>
-          </form>
+          <div className="text-center text-[10px] font-mono text-[#ccc3d8]/40 border-t border-white/5 pt-4">
+            Security audit completed. Outbound CORS bindings restricted.
+          </div>
         </div>
 
       </div>

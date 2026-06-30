@@ -45,21 +45,34 @@ export async function signupAction(formData: FormData): Promise<AuthResponse> {
     return { success: false, error: "Password must be at least 6 characters." };
   }
 
-  const supabase = await createClient();
+  try {
+    const supabase = await createClient();
 
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: fullName,
-        avatar_url: avatarUrl || null,
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          avatar_url: avatarUrl || null,
+        },
       },
-    },
-  });
+    });
 
-  if (error) {
-    return { success: false, error: error.message };
+    if (error) {
+      return { success: false, error: error.message };
+    }
+  } catch (err) {
+    const urlPlaceholder = process.env.NEXT_PUBLIC_SUPABASE_URL || "MISSING";
+    const keyStatus = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY 
+      ? `PRESENT (Starts with ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 8)}...)` 
+      : "MISSING";
+    const message = err instanceof Error ? err.message : "Sign up failed.";
+    
+    return { 
+      success: false, 
+      error: `${message} [Server Config -> URL: ${urlPlaceholder} | Key: ${keyStatus}]` 
+    };
   }
 
   // Redirect on success

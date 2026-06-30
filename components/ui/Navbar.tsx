@@ -10,6 +10,8 @@ import { createClient } from "@/lib/supabase/client";
 export default function Navbar() {
   const pathname = usePathname();
   const [avatarUrl, setAvatarUrl] = useState<string>("");
+  const [initial, setInitial] = useState<string>("U");
+  const [imgError, setImgError] = useState<boolean>(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -19,11 +21,17 @@ export default function Navbar() {
       if (user) {
         const { data, error } = await supabase
           .from("profiles")
-          .select("avatar_url")
+          .select("avatar_url, full_name")
           .eq("id", user.id)
           .single();
-        if (!error && data?.avatar_url) {
-          setAvatarUrl(data.avatar_url);
+        if (!error) {
+          setImgError(false);
+          if (data?.avatar_url) {
+            setAvatarUrl(data.avatar_url);
+          }
+          if (data?.full_name) {
+            setInitial(data.full_name.charAt(0).toUpperCase());
+          }
         }
       }
     };
@@ -35,6 +43,8 @@ export default function Navbar() {
         fetchAvatar();
       } else {
         setAvatarUrl("");
+        setInitial("U");
+        setImgError(false);
       }
     });
 
@@ -102,11 +112,18 @@ export default function Navbar() {
           href="/settings"
           className="flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95"
         >
-          <img
-            alt="User Profile"
-            className="w-9 h-9 rounded-full border-2 border-[#d2bbff] shadow-[0_0_15px_rgba(124,58,237,0.5)] object-cover"
-            src={avatarUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuAegx5ywcsUjx17k72K-rLbX89fFLrZtHywpYOgDiCH7W3JbHZx_Ta8VW60YOqVZsR-VjNI8RTrIAs3eNhjrtNyDIsWZVtRB1zb_8HCy8PFY1i95MbWAqvrr0HKuTaZeOXz99FLRoSmdFEnP_-Cun2SeNVxJmA7T2TrwxFV-ulYamgFrDOiAFc-uECMJUfKuk5Ttzy--nC2uk5WOVzFN17aCw57JGvJWa7mv96w0BWRG4bCO95_As3gJVPb522L-6Xk9u0gNjcF7Q"}
-          />
+          {!avatarUrl || imgError ? (
+            <div className="w-9 h-9 rounded-full border-2 border-[#d2bbff] bg-gradient-to-tr from-[#7c3aed] to-[#94e2ff] flex items-center justify-center shadow-[0_0_15px_rgba(124,58,237,0.5)] text-[#060d20] font-black text-xs font-mono select-none">
+              {initial}
+            </div>
+          ) : (
+            <img
+              alt="User Profile"
+              className="w-9 h-9 rounded-full border-2 border-[#d2bbff] shadow-[0_0_15px_rgba(124,58,237,0.5)] object-cover"
+              src={avatarUrl}
+              onError={() => setImgError(true)}
+            />
+          )}
         </Link>
       </div>
     </nav>
