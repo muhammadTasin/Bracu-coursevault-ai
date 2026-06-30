@@ -1,16 +1,15 @@
-"use strict";
-
 "use client";
 
 import { useState } from "react";
 import Link from "next/link";
 import { signupAction } from "@/lib/actions/auth";
+import { createClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -20,11 +19,41 @@ export default function SignupPage() {
     setErrorMsg("");
 
     try {
+      // 15MB File Size check
+      if (avatarFile && avatarFile.size > 15 * 1024 * 1024) {
+        setErrorMsg("Photo file size must be less than 15MB.");
+        setLoading(false);
+        return;
+      }
+
+      let uploadedAvatarUrl = "";
+
+      if (avatarFile) {
+        const supabase = createClient();
+        const fileExt = avatarFile.name.split(".").pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+        const filePath = `public/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("avatars")
+          .upload(filePath, avatarFile);
+
+        if (uploadError) {
+          throw new Error("Failed to upload photo: " + uploadError.message);
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from("avatars")
+          .getPublicUrl(filePath);
+
+        uploadedAvatarUrl = publicUrl;
+      }
+
       const formData = new FormData();
       formData.append("fullName", fullName);
       formData.append("email", email);
       formData.append("password", password);
-      formData.append("avatarUrl", avatarUrl);
+      formData.append("avatarUrl", uploadedAvatarUrl);
 
       const res = await signupAction(formData);
       if (res && !res.success) {
@@ -80,14 +109,19 @@ export default function SignupPage() {
 
           <div>
             <label className="block text-[10px] font-mono uppercase tracking-wider text-[#ccc3d8] mb-2">
-              Scholar Avatar Photo URL (Optional)
+              Scholar Avatar Photo (Optional, Max 15MB)
             </label>
             <input
-              type="url"
-              placeholder="e.g. https://domain.com/photo.jpg"
-              value={avatarUrl}
-              onChange={(e) => setAvatarUrl(e.target.value)}
-              className="input-glass"
+              type="file"
+              accept="image/*"
+              disabled={loading}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setAvatarFile(file);
+                }
+              }}
+              className="w-full bg-[#2d3449]/40 border border-[#4a4455] rounded-lg px-4 py-3 text-xs text-white focus:outline-none focus:border-[#94e2ff] transition-all file:mr-4 file:py-1.5 file:px-3.5 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-[#94e2ff]/15 file:text-[#94e2ff] file:hover:bg-[#94e2ff]/25 file:cursor-pointer cursor-pointer disabled:opacity-50"
             />
           </div>
 

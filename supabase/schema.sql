@@ -145,3 +145,20 @@ CREATE OR REPLACE TRIGGER trigger_courses_update_timestamp
 CREATE OR REPLACE TRIGGER trigger_resources_update_timestamp
     BEFORE UPDATE ON public.resources
     FOR EACH ROW EXECUTE FUNCTION public.handle_update_timestamp();
+
+--------------------------------------------------------------------------------
+-- 7. STORAGE BUCKET CONFIGURATION (Avatars)
+--------------------------------------------------------------------------------
+-- Create the avatars bucket if it does not already exist
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Policy to allow anonymous uploads to the avatars bucket
+CREATE POLICY "Allow anonymous uploads to avatars" ON storage.objects
+    FOR INSERT WITH CHECK (bucket_id = 'avatars');
+
+-- Policy to allow public access to view avatars
+CREATE POLICY "Allow public select of avatars" ON storage.objects
+    FOR SELECT USING (bucket_id = 'avatars');
+
