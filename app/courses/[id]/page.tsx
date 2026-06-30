@@ -499,27 +499,39 @@ export default function CourseDetail({ params }: PageProps) {
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => addAISuggestion(idx)}
-                      disabled={sug.added}
-                      className={`w-full py-2 rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                        sug.added 
-                          ? "bg-white/5 text-white/40 cursor-default border border-transparent" 
-                          : "btn-primary py-1.5 shadow-none hover:shadow-lg border border-[#7c3aed]/40"
-                      }`}
-                    >
-                      {sug.added ? (
-                        <>
-                          <span className="material-symbols-outlined text-sm">done</span>
-                          Added to Folder
-                        </>
-                      ) : (
-                        <>
-                          <span className="material-symbols-outlined text-sm font-bold">add</span>
-                          Add to Course
-                        </>
-                      )}
-                    </button>
+                    <div className="flex gap-2 w-full">
+                      <a
+                        href={sug.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-secondary py-1.5 px-3 text-xs font-bold transition-all flex items-center justify-center gap-1 flex-1 text-center"
+                      >
+                        <span className="material-symbols-outlined text-sm">open_in_new</span>
+                        Preview
+                      </a>
+                      
+                      <button
+                        onClick={() => addAISuggestion(idx)}
+                        disabled={sug.added}
+                        className={`py-1.5 px-3 rounded text-xs font-bold transition-all flex items-center justify-center gap-1 flex-[1.5] ${
+                          sug.added 
+                            ? "bg-white/5 text-white/40 cursor-default border border-transparent" 
+                            : "btn-primary shadow-none hover:shadow-lg border border-[#7c3aed]/40"
+                        }`}
+                      >
+                        {sug.added ? (
+                          <>
+                            <span className="material-symbols-outlined text-sm">done</span>
+                            Added
+                          </>
+                        ) : (
+                          <>
+                            <span className="material-symbols-outlined text-sm font-bold">add</span>
+                            Add Link
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 ))
               )}

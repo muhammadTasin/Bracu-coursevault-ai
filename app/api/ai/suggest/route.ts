@@ -82,44 +82,9 @@ Important Rules:
 - Do not return empty fields. Generate realistic study resource URLs referencing GitHub, YouTube, or PDF tutorial sites related to the course.
 `;
 
-    // 4. Try Gemini Primary (Max 3.5s timeout)
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        console.log("Calling primary Gemini AI Engine...");
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ 
-          model: "gemini-1.5-flash",
-          generationConfig: { responseMimeType: "application/json" }
-        });
-
-        // 3.5 second timeout wrapper to prevent serverless function hang
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Gemini API call timed out")), 3500)
-        );
-
-        const result = await Promise.race([
-          model.generateContent(prompt),
-          timeoutPromise
-        ]);
-
-        const responseText = result.response.text();
-        const cleanedText = cleanJsonText(responseText);
-        const parsed = JSON.parse(cleanedText);
-        const validated = aiResponseSchema.parse(parsed);
-
-        return NextResponse.json({
-          success: true,
-          provider: "Gemini (Primary)",
-          data: validated
-        });
-      } catch (geminiError) {
-        console.error("Gemini primary failure:", geminiError instanceof Error ? geminiError.message : geminiError);
-      }
-    }
-
-    // 5. Try OpenRouter Fallbacks (Loop through models with low 2.5s timeouts)
+    // 4. Try OpenRouter Primary (Loop through models with low 2.5s timeouts)
     if (process.env.OPENROUTER_API_KEY) {
-      console.log("Entering OpenRouter Failover Chain...");
+      console.log("Entering primary OpenRouter API Engine...");
       for (const openRouterModel of OPENROUTER_MODELS) {
         try {
           console.log(`Trying OpenRouter model: ${openRouterModel}...`);
@@ -160,6 +125,41 @@ Important Rules:
         } catch (openRouterError) {
           console.error(`OpenRouter model ${openRouterModel} failed:`, openRouterError instanceof Error ? openRouterError.message : openRouterError);
         }
+      }
+    }
+
+    // 5. Try Gemini Fallback (Max 3.5s timeout)
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        console.log("Calling fallback Gemini AI Engine...");
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ 
+          model: "gemini-1.5-flash",
+          generationConfig: { responseMimeType: "application/json" }
+        });
+
+        // 3.5 second timeout wrapper to prevent serverless function hang
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Gemini API call timed out")), 3500)
+        );
+
+        const result = await Promise.race([
+          model.generateContent(prompt),
+          timeoutPromise
+        ]);
+
+        const responseText = result.response.text();
+        const cleanedText = cleanJsonText(responseText);
+        const parsed = JSON.parse(cleanedText);
+        const validated = aiResponseSchema.parse(parsed);
+
+        return NextResponse.json({
+          success: true,
+          provider: "Gemini (Fallback)",
+          data: validated
+        });
+      } catch (geminiError) {
+        console.error("Gemini fallback failure:", geminiError instanceof Error ? geminiError.message : geminiError);
       }
     }
 
