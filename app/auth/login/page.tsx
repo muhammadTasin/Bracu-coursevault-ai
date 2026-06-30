@@ -6,6 +6,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { loginAction } from "@/lib/actions/auth";
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -18,11 +20,20 @@ export default function LoginPage() {
     setLoading(true);
     setErrorMsg("");
 
-    // Simulate login for Phase 1
-    setTimeout(() => {
+    try {
+      const formData = new FormData();
+      formData.append("email", email);
+      formData.append("password", password);
+
+      const res = await loginAction(formData);
+      if (res && !res.success) {
+        setErrorMsg(res.error || "Invalid credentials.");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Authentication failed.");
+    } finally {
       setLoading(false);
-      router.push("/dashboard");
-    }, 1500);
+    }
   };
 
   return (

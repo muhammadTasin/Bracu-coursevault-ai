@@ -2,26 +2,66 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getProfileAction, updateProfileAction } from "@/lib/actions/profiles";
+import { logoutAction } from "@/lib/actions/auth";
 
 export default function SettingsPage() {
-  const [fullName, setFullName] = useState("Tasin Muhammad");
-  const [email, setEmail] = useState("tasin@university.edu");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(true);
+  
   const [activeProvider, setActiveProvider] = useState("gemini-primary");
   const [geminiKeyInput, setGeminiKeyInput] = useState("");
   const [openRouterKeyInput, setOpenRouterKeyInput] = useState("");
+  
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingKeys, setSavingKeys] = useState(false);
   const [alertMsg, setAlertMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const handleUpdateProfile = (e: React.FormEvent) => {
+  const loadProfile = async () => {
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      const res = await getProfileAction();
+      if (res.success && res.data) {
+        setFullName(res.data.full_name || "");
+        setEmail(res.data.email);
+      } else {
+        setErrorMsg(res.error || "Failed to retrieve your profile settings.");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "An unexpected error occurred.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingProfile(true);
-    setTimeout(() => {
+    setErrorMsg("");
+    setAlertMsg("");
+
+    try {
+      const res = await updateProfileAction(fullName);
+      if (res.success && res.data) {
+        setFullName(res.data.full_name || "");
+        setAlertMsg("Identity synchronized successfully!");
+        setTimeout(() => setAlertMsg(""), 3500);
+      } else {
+        setErrorMsg(res.error || "Failed to update profile details.");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to save profile.");
+    } finally {
       setSavingProfile(false);
-      setAlertMsg("Profile updated successfully!");
-      setTimeout(() => setAlertMsg(""), 3000);
-    }, 1000);
+    }
   };
 
   const handleSaveKeysPlaceholder = (e: React.FormEvent) => {
@@ -32,26 +72,63 @@ export default function SettingsPage() {
       setGeminiKeyInput("");
       setOpenRouterKeyInput("");
       setAlertMsg("Secure credentials updated on server-side simulator!");
-      setTimeout(() => setAlertMsg(""), 3000);
+      setTimeout(() => setAlertMsg(""), 3500);
     }, 1200);
   };
+
+  const handleLogout = async () => {
+    if (confirm("Are you sure you want to log out of your study universe?")) {
+      await logoutAction();
+    }
+  };
+
+  if (loading) {
+    return (
+      <main className="flex-1 pt-32 pb-24 px-4 md:px-12 max-w-[1440px] mx-auto w-full flex flex-col gap-8 relative z-10">
+        <div className="animate-pulse flex flex-col gap-4 border-b border-white/10 pb-6">
+          <div className="h-10 w-1/4 bg-white/10 rounded" />
+          <div className="h-4 w-1/3 bg-white/5 rounded mt-1" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-6 bento-card h-[300px] border border-white/5 animate-pulse" />
+          <div className="lg:col-span-6 bento-card h-[300px] border border-white/5 animate-pulse" />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 pt-32 pb-24 px-4 md:px-12 max-w-[1440px] mx-auto w-full flex flex-col gap-10 relative z-10">
       
       {/* Page Header */}
-      <div className="border-b border-white/10 pb-6">
-        <h1 className="text-3xl font-black text-white tracking-tight text-gradient">
-          Terminal Settings
-        </h1>
-        <p className="text-sm text-[#ccc3d8]/70 mt-1">
-          Manage your student profile credentials and configure secure AI backend keys.
-        </p>
+      <div className="border-b border-white/10 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-white tracking-tight text-gradient">
+            Terminal Settings
+          </h1>
+          <p className="text-sm text-[#ccc3d8]/70 mt-1">
+            Manage your student profile credentials and configure secure AI backend keys.
+          </p>
+        </div>
+        
+        <button
+          onClick={handleLogout}
+          className="btn-secondary py-2 px-5 text-sm border-rose-500/50 text-rose-300 hover:border-rose-500 hover:bg-rose-950/20 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] self-start transition-all cursor-pointer flex items-center gap-2"
+        >
+          <span className="material-symbols-outlined text-lg">logout</span>
+          Logout Sector
+        </button>
       </div>
 
+      {/* Status Alerts */}
       {alertMsg && (
         <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/40 text-sm text-emerald-400 text-center animate-in fade-in">
           {alertMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="p-4 rounded-xl bg-[#93000a]/20 border border-[#ffb4ab]/40 text-sm text-[#ffb4ab] text-center animate-in fade-in">
+          {errorMsg}
         </div>
       )}
 
@@ -74,29 +151,29 @@ export default function SettingsPage() {
               <input
                 type="text"
                 required
+                disabled={savingProfile}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="input-glass"
+                className="input-glass disabled:opacity-50"
               />
             </div>
 
             <div>
               <label className="block text-[10px] font-mono uppercase tracking-wider text-[#ccc3d8]/80 mb-2">
-                Academic Mailbox (Email)
+                Academic Mailbox (Email - Read Only)
               </label>
               <input
                 type="email"
-                required
+                disabled
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input-glass"
+                className="input-glass opacity-60 cursor-not-allowed"
               />
             </div>
 
             <button
               type="submit"
               disabled={savingProfile}
-              className="btn-primary py-2.5 px-6 mt-2 text-sm self-start"
+              className="btn-primary py-2.5 px-6 mt-2 text-sm self-start disabled:opacity-50"
             >
               {savingProfile ? "Syncing..." : "Update Profile"}
             </button>
@@ -161,7 +238,7 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={savingKeys}
-              className="btn-secondary py-2.5 px-6 mt-2 text-sm self-start border-[#7c3aed]/50 hover:border-[#7c3aed]"
+              className="btn-secondary py-2.5 px-6 mt-2 text-sm self-start border-[#7c3aed]/50 hover:border-[#7c3aed] disabled:opacity-50"
             >
               {savingKeys ? "Encrypting..." : "Save Secure Keys"}
             </button>

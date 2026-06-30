@@ -2,9 +2,15 @@
 
 "use client";
 
-import { useState, use } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
-import { Resource, ResourceType } from "@/types";
+import { Resource, ResourceType, Course } from "@/types";
+import { getCourseByIdAction } from "@/lib/actions/courses";
+import {
+  getResourcesAction,
+  addResourceAction,
+  deleteResourceAction,
+} from "@/lib/actions/resources";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -14,51 +20,19 @@ export default function CourseDetail({ params }: PageProps) {
   const resolvedParams = use(params);
   const courseId = resolvedParams.id;
 
-  // Mock course details
-  const courseDetails = {
-    code: courseId === "cse422-ai" ? "CSE 422" : "CSE 427",
-    title: courseId === "cse422-ai" ? "Artificial Intelligence" : "Machine Learning",
-    description: courseId === "cse422-ai" 
-      ? "Foundational AI topics including search strategies, logic agents, and reasoning."
-      : "Undergraduate level machine learning course resources including lecture notes and assignments."
-  };
+  const [course, setCourse] = useState<Course | null>(null);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
-  // Mock initial resource list
-  const [resources, setResources] = useState<Resource[]>([
-    {
-      id: "res-1",
-      user_id: "user-123",
-      course_id: courseId,
-      title: "ML Algorithms From Scratch",
-      url: "https://github.com/eriklindernoren/ML-From-Scratch",
-      resource_type: "GitHub",
-      notes: "Useful code implementations of ML algorithms written in pure Python.",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    },
-    {
-      id: "res-2",
-      user_id: "user-123",
-      course_id: courseId,
-      title: "Stanford CS229 Playlist",
-      url: "https://youtube.com/playlist?list=PLoROMvodv4rMiGQp3WXSihuvxsrarTR87",
-      resource_type: "YouTube",
-      notes: "Andrew Ng's flagship ML lectures.",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    },
-    {
-      id: "res-3",
-      user_id: "user-123",
-      course_id: courseId,
-      title: "Towards Data Science Blog",
-      url: "https://towardsdatascience.com",
-      resource_type: "Website",
-      notes: "Daily insights and tutorials on machine learning algorithms.",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-  ]);
+  // Modal forms states
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [resTitle, setResTitle] = useState("");
+  const [resUrl, setResUrl] = useState("");
+  const [resType, setResType] = useState<ResourceType>("Website");
+  const [resNotes, setResNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   // AI suggestions list mock
   const [aiSuggestions, setAiSuggestions] = useState([
@@ -66,7 +40,7 @@ export default function CourseDetail({ params }: PageProps) {
       title: "MIT 6.036 Introduction to Machine Learning",
       url: "https://openlearninglibrary.mit.edu/courses/course-v1:MITx+6.036+everyone/about",
       type: "Website" as ResourceType,
-      description: "Interactive online materials aligning closely with undergrad ML syllabus.",
+      description: "Interactive online materials aligning closely with undergrad course syllabus.",
       added: false,
     },
     {
@@ -81,12 +55,36 @@ export default function CourseDetail({ params }: PageProps) {
   const [aiScanning, setAiScanning] = useState(false);
   const [aiStatusMessage, setAiStatusMessage] = useState("Scan complete.");
 
-  // Modal forms states
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [resTitle, setResTitle] = useState("");
-  const [resUrl, setResUrl] = useState("");
-  const [resType, setResType] = useState<ResourceType>("Website");
-  const [resNotes, setResNotes] = useState("");
+  // Fetch course and its resources
+  const loadData = async () => {
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      const courseRes = await getCourseByIdAction(courseId);
+      if (courseRes.success && courseRes.data) {
+        setCourse(courseRes.data);
+      } else {
+        setErrorMsg(courseRes.error || "Failed to load course folder details.");
+        setLoading(false);
+        return;
+      }
+
+      const resourcesRes = await getResourcesAction(courseId);
+      if (resourcesRes.success && resourcesRes.data) {
+        setResources(resourcesRes.data);
+      } else {
+        setErrorMsg(resourcesRes.error || "Failed to load resource links.");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "An unexpected error occurred.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [courseId]);
 
   const triggerAIScan = () => {
     setAiScanning(true);
@@ -97,55 +95,92 @@ export default function CourseDetail({ params }: PageProps) {
     }, 2000);
   };
 
-  const handleAddResource = (e: React.FormEvent) => {
+  const handleAddResource = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resTitle || !resUrl) return;
+    if (!resTitle.trim() || !resUrl.trim()) return;
 
-    const newRes: Resource = {
-      id: `res-${Date.now()}`,
-      user_id: "user-123",
-      course_id: courseId,
-      title: resTitle,
-      url: resUrl,
-      resource_type: resType,
-      notes: resNotes || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
+    setSubmitting(true);
+    setErrorMsg("");
+    setSuccessMsg("");
 
-    setResources([...resources, newRes]);
-    setResTitle("");
-    setResUrl("");
-    setResType("Website");
-    setResNotes("");
-    setIsAddModalOpen(false);
+    try {
+      const res = await addResourceAction(courseId, {
+        title: resTitle,
+        url: resUrl,
+        resource_type: resType,
+        notes: resNotes,
+      });
+
+      if (res.success && res.data) {
+        setResources([res.data, ...resources]);
+        setSuccessMsg(`Resource "${resTitle}" saved successfully!`);
+        setResTitle("");
+        setResUrl("");
+        setResType("Website");
+        setResNotes("");
+        setIsAddModalOpen(false);
+        setTimeout(() => setSuccessMsg(""), 4000);
+      } else {
+        setErrorMsg(res.error || "Failed to save link.");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to add resource.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleDeleteResource = (id: string) => {
-    setResources(resources.filter((res) => res.id !== id));
+  const handleDeleteResource = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this resource link?")) {
+      return;
+    }
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    try {
+      const res = await deleteResourceAction(id, courseId);
+      if (res.success) {
+        setResources(resources.filter((r) => r.id !== id));
+        setSuccessMsg("Resource deleted successfully.");
+        setTimeout(() => setSuccessMsg(""), 3000);
+      } else {
+        setErrorMsg(res.error || "Failed to delete link.");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to delete resource.");
+    }
   };
 
-  const addAISuggestion = (index: number) => {
+  const addAISuggestion = async (index: number) => {
     const suggestion = aiSuggestions[index];
     if (suggestion.added) return;
 
-    const newRes: Resource = {
-      id: `res-${Date.now()}`,
-      user_id: "user-123",
-      course_id: courseId,
-      title: suggestion.title,
-      url: suggestion.url,
-      resource_type: suggestion.type,
-      notes: suggestion.description,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
+    setErrorMsg("");
+    setSuccessMsg("");
 
-    setResources([...resources, newRes]);
-    
-    const updatedSuggestions = [...aiSuggestions];
-    updatedSuggestions[index].added = true;
-    setAiSuggestions(updatedSuggestions);
+    try {
+      const res = await addResourceAction(courseId, {
+        title: suggestion.title,
+        url: suggestion.url,
+        resource_type: suggestion.type,
+        notes: suggestion.description,
+      });
+
+      if (res.success && res.data) {
+        setResources([res.data, ...resources]);
+        setSuccessMsg(`AI Resource "${suggestion.title}" added!`);
+        
+        const updatedSuggestions = [...aiSuggestions];
+        updatedSuggestions[index].added = true;
+        setAiSuggestions(updatedSuggestions);
+
+        setTimeout(() => setSuccessMsg(""), 4000);
+      } else {
+        setErrorMsg(res.error || "Failed to add suggested resource.");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to add suggestion.");
+    }
   };
 
   const categories: { type: ResourceType; label: string; glowClass: string; icon: string }[] = [
@@ -156,6 +191,43 @@ export default function CourseDetail({ params }: PageProps) {
     { type: "Practice", label: "Practice Problems", glowClass: "glow-violet", icon: "task_alt" },
     { type: "Other", label: "Other Materials", glowClass: "glow-other", icon: "folder_open" }
   ];
+
+  if (loading) {
+    return (
+      <main className="flex-1 pt-32 pb-24 px-4 md:px-12 max-w-[1440px] mx-auto w-full flex flex-col gap-8 relative z-10">
+        <div className="animate-pulse flex flex-col gap-4 border-b border-white/10 pb-6">
+          <div className="h-4 w-1/4 bg-white/10 rounded" />
+          <div className="h-10 w-2/3 bg-white/10 rounded mt-2" />
+          <div className="h-4 w-1/2 bg-white/5 rounded mt-1" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[1, 2, 4].map((n) => (
+              <div key={n} className="bento-card min-h-[300px] border border-white/5 animate-pulse" />
+            ))}
+          </div>
+          <div className="lg:col-span-4 bento-card min-h-[500px] border border-white/5 animate-pulse" />
+        </div>
+      </main>
+    );
+  }
+
+  if (!course) {
+    return (
+      <main className="flex-1 pt-32 pb-24 px-4 md:px-12 max-w-[1440px] mx-auto w-full flex flex-col gap-6 items-center justify-center relative z-10">
+        <div className="bento-card text-center p-12 max-w-md border border-white/10">
+          <span className="material-symbols-outlined text-4xl text-[#ffb4ab] mb-4">warning</span>
+          <h2 className="text-xl font-bold text-white mb-2">Folder Not Found</h2>
+          <p className="text-sm text-[#ccc3d8]/80 leading-relaxed mb-6">
+            We could not retrieve this course folder. It may have been deleted, or you do not have permissions to access it.
+          </p>
+          <Link href="/dashboard" className="btn-primary py-2 px-6">
+            Return to Galaxy
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 pt-32 pb-24 px-4 md:px-12 max-w-[1440px] mx-auto w-full flex flex-col gap-8 relative z-10">
@@ -168,18 +240,20 @@ export default function CourseDetail({ params }: PageProps) {
           </Link>
           <span className="material-symbols-outlined text-xs">chevron_right</span>
           <span className="text-[#94e2ff]">
-            {courseDetails.code}
+            {course.course_code}
           </span>
         </div>
 
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-white/10">
           <div>
             <h1 className="text-3xl md:text-5xl font-black text-white text-gradient">
-              {courseDetails.code} — {courseDetails.title}
+              {course.course_code} — {course.course_title}
             </h1>
-            <p className="text-sm text-[#ccc3d8]/80 mt-1 max-w-2xl leading-relaxed">
-              {courseDetails.description}
-            </p>
+            {course.description && (
+              <p className="text-sm text-[#ccc3d8]/80 mt-1 max-w-2xl leading-relaxed">
+                {course.description}
+              </p>
+            )}
           </div>
           
           <div className="flex flex-wrap gap-3">
@@ -200,6 +274,18 @@ export default function CourseDetail({ params }: PageProps) {
           </div>
         </div>
       </div>
+
+      {/* Message Banners */}
+      {errorMsg && (
+        <div className="p-4 rounded-xl bg-[#93000a]/20 border border-[#ffb4ab]/40 text-sm text-[#ffb4ab] text-center animate-in fade-in">
+          {errorMsg}
+        </div>
+      )}
+      {successMsg && (
+        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/40 text-sm text-emerald-400 text-center animate-in fade-in">
+          {successMsg}
+        </div>
+      )}
 
       {/* Main Grid: Category Columns and AI Side Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -266,7 +352,7 @@ export default function CourseDetail({ params }: PageProps) {
                               </a>
                               <button
                                 onClick={() => handleDeleteResource(res.id)}
-                                className="text-[#ffb4ab] hover:text-[#ff9b9b] p-1 rounded hover:bg-white/5 cursor-pointer"
+                                className="text-[#ffb4ab] hover:text-[#ff9b9b] p-1 rounded hover:bg-white/5 cursor-pointer transition-colors"
                                 title="Delete"
                               >
                                 <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -308,7 +394,7 @@ export default function CourseDetail({ params }: PageProps) {
               <button
                 onClick={triggerAIScan}
                 disabled={aiScanning}
-                className="text-xs font-mono text-[#94e2ff] hover:underline cursor-pointer"
+                className="text-xs font-mono text-[#94e2ff] hover:underline cursor-pointer disabled:opacity-50"
               >
                 Scan Now
               </button>
@@ -324,7 +410,7 @@ export default function CourseDetail({ params }: PageProps) {
               </div>
               <p className="text-xs text-[#ccc3d8] leading-relaxed">
                 {aiScanning 
-                  ? `Querying Gemini for BRAC University ${courseDetails.code} resource database...` 
+                  ? `Querying Gemini for BRAC University ${course.course_code} resource database...` 
                   : aiStatusMessage}
               </p>
             </div>
@@ -393,7 +479,9 @@ export default function CourseDetail({ params }: PageProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-[#060d20]/80 backdrop-blur-md transition-opacity"
-            onClick={() => setIsAddModalOpen(false)}
+            onClick={() => {
+              if (!submitting) setIsAddModalOpen(false);
+            }}
           />
           <div className="glass-panel rounded-2xl w-full max-w-md p-6 md:p-8 relative z-10 border border-white/20 shadow-2xl animate-in fade-in zoom-in duration-300">
             <div className="flex justify-between items-center mb-6">
@@ -403,7 +491,8 @@ export default function CourseDetail({ params }: PageProps) {
               </h3>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-white/60 hover:text-white transition-colors cursor-pointer"
+                disabled={submitting}
+                className="text-white/60 hover:text-white transition-colors cursor-pointer disabled:opacity-40"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -417,10 +506,11 @@ export default function CourseDetail({ params }: PageProps) {
                 <input
                   type="url"
                   required
+                  disabled={submitting}
                   placeholder="https://example.com/notes"
                   value={resUrl}
                   onChange={(e) => setResUrl(e.target.value)}
-                  className="input-glass"
+                  className="input-glass disabled:opacity-50"
                 />
               </div>
 
@@ -431,10 +521,11 @@ export default function CourseDetail({ params }: PageProps) {
                 <input
                   type="text"
                   required
+                  disabled={submitting}
                   placeholder="e.g. Backpropagation Tutorial"
                   value={resTitle}
                   onChange={(e) => setResTitle(e.target.value)}
-                  className="input-glass"
+                  className="input-glass disabled:opacity-50"
                 />
               </div>
 
@@ -444,8 +535,9 @@ export default function CourseDetail({ params }: PageProps) {
                 </label>
                 <select
                   value={resType}
+                  disabled={submitting}
                   onChange={(e) => setResType(e.target.value as ResourceType)}
-                  className="w-full bg-[#2d3449]/40 border border-[#4a4455] rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#94e2ff] transition-all cursor-pointer"
+                  className="w-full bg-[#2d3449]/40 border border-[#4a4455] rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#94e2ff] transition-all cursor-pointer disabled:opacity-50"
                 >
                   <option className="bg-[#131b2e]" value="GitHub">GitHub Repository</option>
                   <option className="bg-[#131b2e]" value="YouTube">YouTube Video</option>
@@ -462,10 +554,11 @@ export default function CourseDetail({ params }: PageProps) {
                 </label>
                 <textarea
                   placeholder="Brief context about this link..."
+                  disabled={submitting}
                   value={resNotes}
                   onChange={(e) => setResNotes(e.target.value)}
                   rows={2}
-                  className="input-glass resize-none"
+                  className="input-glass resize-none disabled:opacity-50"
                 />
               </div>
 
@@ -473,15 +566,17 @@ export default function CourseDetail({ params }: PageProps) {
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="btn-secondary py-2.5 px-4 text-sm flex-1"
+                  disabled={submitting}
+                  className="btn-secondary py-2.5 px-4 text-sm flex-1 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn-primary py-2.5 px-4 text-sm flex-1"
+                  disabled={submitting}
+                  className="btn-primary py-2.5 px-4 text-sm flex-1 disabled:opacity-50"
                 >
-                  Save Resource
+                  {submitting ? "Saving..." : "Save Resource"}
                 </button>
               </div>
             </form>
