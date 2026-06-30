@@ -35,6 +35,7 @@ export async function signupAction(formData: FormData): Promise<AuthResponse> {
   const fullName = formData.get("fullName") as string;
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+  const avatarUrl = formData.get("avatarUrl") as string;
 
   if (!fullName || !email || !password) {
     return { success: false, error: "All fields are required." };
@@ -52,6 +53,7 @@ export async function signupAction(formData: FormData): Promise<AuthResponse> {
     options: {
       data: {
         full_name: fullName,
+        avatar_url: avatarUrl || null,
       },
     },
   });

@@ -9,6 +9,7 @@ import { logoutAction } from "@/lib/actions/auth";
 export default function SettingsPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [loading, setLoading] = useState(true);
   
   const [activeProvider, setActiveProvider] = useState("gemini-primary");
@@ -28,6 +29,7 @@ export default function SettingsPage() {
       if (res.success && res.data) {
         setFullName(res.data.full_name || "");
         setEmail(res.data.email);
+        setAvatarUrl(res.data.avatar_url || "");
       } else {
         setErrorMsg(res.error || "Failed to retrieve your profile settings.");
       }
@@ -53,9 +55,10 @@ export default function SettingsPage() {
     setAlertMsg("");
 
     try {
-      const res = await updateProfileAction(fullName);
+      const res = await updateProfileAction(fullName, avatarUrl);
       if (res.success && res.data) {
         setFullName(res.data.full_name || "");
+        setAvatarUrl(res.data.avatar_url || "");
         setAlertMsg("Identity synchronized successfully!");
         setTimeout(() => setAlertMsg(""), 3500);
       } else {
@@ -159,6 +162,20 @@ export default function SettingsPage() {
                 disabled={savingProfile}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                className="input-glass disabled:opacity-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-[#ccc3d8]/80 mb-2">
+                Scholar Avatar Photo URL
+              </label>
+              <input
+                type="url"
+                disabled={savingProfile}
+                placeholder="e.g. https://domain.com/photo.jpg"
+                value={avatarUrl}
+                onChange={(e) => setAvatarUrl(e.target.value)}
                 className="input-glass disabled:opacity-50"
               />
             </div>

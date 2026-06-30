@@ -2,11 +2,46 @@
 
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    const fetchAvatar = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("avatar_url")
+          .eq("id", user.id)
+          .single();
+        if (!error && data?.avatar_url) {
+          setAvatarUrl(data.avatar_url);
+        }
+      }
+    };
+
+    fetchAvatar();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        fetchAvatar();
+      } else {
+        setAvatarUrl("");
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const isLinkActive = (path: string) => {
     if (path === "/" && pathname === "/") return true;
@@ -70,7 +105,7 @@ export default function Navbar() {
           <img
             alt="User Profile"
             className="w-9 h-9 rounded-full border-2 border-[#d2bbff] shadow-[0_0_15px_rgba(124,58,237,0.5)] object-cover"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAegx5ywcsUjx17k72K-rLbX89fFLrZtHywpYOgDiCH7W3JbHZx_Ta8VW60YOqVZsR-VjNI8RTrIAs3eNhjrtNyDIsWZVtRB1zb_8HCy8PFY1i95MbWAqvrr0HKuTaZeOXz99FLRoSmdFEnP_-Cun2SeNVxJmA7T2TrwxFV-ulYamgFrDOiAFc-uECMJUfKuk5Ttzy--nC2uk5WOVzFN17aCw57JGvJWa7mv96w0BWRG4bCO95_As3gJVPb522L-6Xk9u0gNjcF7Q"
+            src={avatarUrl || "https://lh3.googleusercontent.com/aida-public/AB6AXuAegx5ywcsUjx17k72K-rLbX89fFLrZtHywpYOgDiCH7W3JbHZx_Ta8VW60YOqVZsR-VjNI8RTrIAs3eNhjrtNyDIsWZVtRB1zb_8HCy8PFY1i95MbWAqvrr0HKuTaZeOXz99FLRoSmdFEnP_-Cun2SeNVxJmA7T2TrwxFV-ulYamgFrDOiAFc-uECMJUfKuk5Ttzy--nC2uk5WOVzFN17aCw57JGvJWa7mv96w0BWRG4bCO95_As3gJVPb522L-6Xk9u0gNjcF7Q"}
           />
         </Link>
       </div>

@@ -10,6 +10,7 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -23,6 +24,7 @@ export default function SignupPage() {
       formData.append("fullName", fullName);
       formData.append("email", email);
       formData.append("password", password);
+      formData.append("avatarUrl", avatarUrl);
 
       const res = await signupAction(formData);
       if (res && !res.success) {
@@ -72,6 +74,19 @@ export default function SignupPage() {
               placeholder="e.g. Tasin Muhammad"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
+              className="input-glass"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-mono uppercase tracking-wider text-[#ccc3d8] mb-2">
+              Scholar Avatar Photo URL (Optional)
+            </label>
+            <input
+              type="url"
+              placeholder="e.g. https://domain.com/photo.jpg"
+              value={avatarUrl}
+              onChange={(e) => setAvatarUrl(e.target.value)}
               className="input-glass"
             />
           </div>

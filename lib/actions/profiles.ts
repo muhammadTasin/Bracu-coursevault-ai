@@ -37,7 +37,8 @@ export async function getProfileAction(): Promise<ActionResponse<Profile>> {
 }
 
 export async function updateProfileAction(
-  fullName: string
+  fullName: string,
+  avatarUrl?: string | null
 ): Promise<ActionResponse<Profile>> {
   try {
     if (!fullName.trim()) {
@@ -51,9 +52,17 @@ export async function updateProfileAction(
       return { success: false, error: "Unauthorized access." };
     }
 
+    const updates: { full_name: string; avatar_url?: string | null } = {
+      full_name: fullName,
+    };
+
+    if (avatarUrl !== undefined) {
+      updates.avatar_url = avatarUrl || null;
+    }
+
     const { data, error } = await supabase
       .from("profiles")
-      .update({ full_name: fullName })
+      .update(updates)
       .eq("id", user.id)
       .select()
       .single();

@@ -15,6 +15,7 @@ CREATE TABLE public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT NOT NULL,
     full_name TEXT,
+    avatar_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
@@ -109,11 +110,12 @@ CREATE INDEX idx_ai_suggestions_course_id ON public.ai_suggestions(course_id);
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.profiles (id, email, full_name)
+    INSERT INTO public.profiles (id, email, full_name, avatar_url)
     VALUES (
         new.id,
         new.email,
-        COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', 'New Scholar')
+        COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', 'New Scholar'),
+        COALESCE(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'avatar', NULL)
     );
     RETURN NEW;
 END;
