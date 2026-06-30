@@ -51,7 +51,7 @@ export async function createCourseAction(
       };
     }
 
-    const { course_code, course_title, description } = validated.data;
+    const { course_code, course_title, description, tags: inputTags } = validated.data;
     const supabase = await createClient();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
@@ -62,7 +62,7 @@ export async function createCourseAction(
     // Default tag based on course code
     const tagMatch = course_code.match(/[a-zA-Z]+/g);
     const primaryTag = tagMatch ? tagMatch[0].toUpperCase() : "COURSE";
-    const tags = [primaryTag, "BRACU"];
+    const tags = Array.from(new Set([primaryTag, "BRACU", ...(inputTags || [])]));
 
     const { data, error } = await supabase
       .from("courses")

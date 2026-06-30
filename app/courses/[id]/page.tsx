@@ -34,26 +34,17 @@ export default function CourseDetail({ params }: PageProps) {
   const [resNotes, setResNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // AI suggestions list mock
-  const [aiSuggestions, setAiSuggestions] = useState([
-    {
-      title: "MIT 6.036 Introduction to Machine Learning",
-      url: "https://openlearninglibrary.mit.edu/courses/course-v1:MITx+6.036+everyone/about",
-      type: "Website" as ResourceType,
-      description: "Interactive online materials aligning closely with undergrad course syllabus.",
-      added: false,
-    },
-    {
-      title: "Scikit-Learn Official User Guide",
-      url: "https://scikit-learn.org/stable/user_guide.html",
-      type: "GitHub" as ResourceType,
-      description: "Excellent tutorials for practical regression and clustering assignments.",
-      added: false,
-    }
-  ]);
+  // AI suggestions list
+  const [aiSuggestions, setAiSuggestions] = useState<{
+    title: string;
+    url: string;
+    type: ResourceType;
+    description: string;
+    added: boolean;
+  }[]>([]);
 
   const [aiScanning, setAiScanning] = useState(false);
-  const [aiStatusMessage, setAiStatusMessage] = useState("Scan complete.");
+  const [aiStatusMessage, setAiStatusMessage] = useState("Click AI Sync Search to scan BRACU databases.");
 
   // Fetch course and its resources
   useEffect(() => {
@@ -99,13 +90,42 @@ export default function CourseDetail({ params }: PageProps) {
     };
   }, [courseId]);
 
-  const triggerAIScan = () => {
+  const triggerAIScan = async () => {
     setAiScanning(true);
     setAiStatusMessage("Scanning BRAC University level resources...");
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/ai/suggest", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: course?.course_code || "" }),
+      });
+      const data = await res.json();
+      if (data.success && data.data && data.data.suggestedResources) {
+        const mapped = data.data.suggestedResources.map((sug: { title: string; url: string; type: string; description?: string }) => {
+          const alreadyExists = resources.some(
+            (r) => r.url.toLowerCase().trim() === sug.url.toLowerCase().trim()
+          );
+          return {
+            title: sug.title,
+            url: sug.url,
+            type: sug.type as ResourceType,
+            description: sug.description || "",
+            added: alreadyExists,
+          };
+        });
+        setAiSuggestions(mapped);
+        setAiStatusMessage(`Scan complete. Loaded ${mapped.length} resources via ${data.provider || "AI"}.`);
+      } else {
+        setAiStatusMessage("Scan failed: " + (data.error || "Unknown AI error"));
+      }
+    } catch (err) {
+      console.error(err);
+      setAiStatusMessage("Network error during AI scan. Loaded offline defaults.");
+    } finally {
       setAiScanning(false);
-      setAiStatusMessage("Scan complete. 2 highly relevant suggestions loaded.");
-    }, 2000);
+    }
   };
 
   const handleAddResource = async (e: React.FormEvent) => {
@@ -438,52 +458,61 @@ export default function CourseDetail({ params }: PageProps) {
                 AI Suggested Resources
               </h4>
 
-              {aiSuggestions.map((sug, idx) => (
-                <div
-                  key={idx}
-                  className="p-4 rounded-xl bg-[#171f33]/40 border border-white/5 hover:border-[#7c3aed]/30 transition-all flex flex-col gap-3"
-                >
-                  <div className="flex justify-between items-start">
-                    <span className="glass-chip text-[9px] px-2 py-0.5 border-none bg-white/5">
-                      {sug.type}
-                    </span>
-                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-                      95% Match
-                    </span>
-                  </div>
-                  
-                  <div>
-                    <h5 className="text-sm font-bold text-white leading-snug">
-                      {sug.title}
-                    </h5>
-                    <p className="text-xs text-[#ccc3d8]/80 mt-1 leading-relaxed">
-                      {sug.description}
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={() => addAISuggestion(idx)}
-                    disabled={sug.added}
-                    className={`w-full py-2 rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                      sug.added 
-                        ? "bg-white/5 text-white/40 cursor-default border border-transparent" 
-                        : "btn-primary py-1.5 shadow-none hover:shadow-lg border border-[#7c3aed]/40"
-                    }`}
-                  >
-                    {sug.added ? (
-                      <>
-                        <span className="material-symbols-outlined text-sm">done</span>
-                        Added to Folder
-                      </>
-                    ) : (
-                      <>
-                        <span className="material-symbols-outlined text-sm font-bold">add</span>
-                        Add to Course
-                      </>
-                    )}
-                  </button>
+              {aiSuggestions.length === 0 ? (
+                <div className="text-center py-12 px-4 rounded-xl border border-dashed border-white/10 bg-[#171f33]/20 flex flex-col gap-3 items-center justify-center relative z-10 mt-2">
+                  <span className="material-symbols-outlined text-3xl text-[#94e2ff]/40">search_spark</span>
+                  <p className="text-xs text-[#ccc3d8]/60 leading-relaxed max-w-[200px] text-center">
+                    Click &quot;Scan Now&quot; or &quot;AI Sync Search&quot; to scan and load BRACU course study links.
+                  </p>
                 </div>
-              ))}
+              ) : (
+                aiSuggestions.map((sug, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 rounded-xl bg-[#171f33]/40 border border-white/5 hover:border-[#7c3aed]/30 transition-all flex flex-col gap-3"
+                  >
+                    <div className="flex justify-between items-start">
+                      <span className="glass-chip text-[9px] px-2 py-0.5 border-none bg-white/5">
+                        {sug.type}
+                      </span>
+                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+                        95% Match
+                      </span>
+                    </div>
+                    
+                    <div>
+                      <h5 className="text-sm font-bold text-white leading-snug">
+                        {sug.title}
+                      </h5>
+                      <p className="text-xs text-[#ccc3d8]/80 mt-1 leading-relaxed">
+                        {sug.description}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => addAISuggestion(idx)}
+                      disabled={sug.added}
+                      className={`w-full py-2 rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        sug.added 
+                          ? "bg-white/5 text-white/40 cursor-default border border-transparent" 
+                          : "btn-primary py-1.5 shadow-none hover:shadow-lg border border-[#7c3aed]/40"
+                      }`}
+                    >
+                      {sug.added ? (
+                        <>
+                          <span className="material-symbols-outlined text-sm">done</span>
+                          Added to Folder
+                        </>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-sm font-bold">add</span>
+                          Add to Course
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
 
           </div>

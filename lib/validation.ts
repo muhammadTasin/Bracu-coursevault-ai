@@ -18,6 +18,7 @@ export const courseSchema = z.object({
     .max(500, "Description cannot exceed 500 characters")
     .optional()
     .or(z.literal("")),
+  tags: z.array(z.string()).optional(),
 });
 
 export const resourceSchema = z.object({
