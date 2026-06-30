@@ -4,12 +4,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-
 import { loginAction } from "@/lib/actions/auth";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -29,8 +26,9 @@ export default function LoginPage() {
       if (res && !res.success) {
         setErrorMsg(res.error || "Invalid credentials.");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Authentication failed.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Authentication failed.";
+      setErrorMsg(message);
     } finally {
       setLoading(false);
     }

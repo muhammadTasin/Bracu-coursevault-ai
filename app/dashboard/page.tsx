@@ -35,15 +35,19 @@ export default function Dashboard() {
       } else {
         setErrorMsg(res.error || "Failed to load courses from your galaxy.");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "An unexpected error occurred.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setErrorMsg(message);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadCourses();
+    const timer = setTimeout(() => {
+      loadCourses();
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleAddCourse = async (e: React.FormEvent) => {
@@ -72,8 +76,9 @@ export default function Dashboard() {
       } else {
         setErrorMsg(res.error || "Failed to initialize folder.");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to add course.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to add course.";
+      setErrorMsg(message);
     } finally {
       setSubmitting(false);
     }
@@ -95,8 +100,9 @@ export default function Dashboard() {
       } else {
         setErrorMsg(res.error || "Failed to delete course.");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "An error occurred during deletion.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "An error occurred during deletion.";
+      setErrorMsg(message);
     }
   };
 

@@ -1,11 +1,11 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { courseSchema } from "@/lib/validation";
+import { courseSchema, CourseInput } from "@/lib/validation";
 import { Course } from "@/types";
 import { revalidatePath } from "next/cache";
 
-export interface ActionResponse<T = any> {
+export interface ActionResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -32,14 +32,15 @@ export async function getCoursesAction(): Promise<ActionResponse<Course[]>> {
     }
 
     return { success: true, data: data as Course[] };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Failed to retrieve courses." };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to retrieve courses.";
+    return { success: false, error: message };
   }
 }
 
 // Create a new course
 export async function createCourseAction(
-  rawInput: any
+  rawInput: CourseInput
 ): Promise<ActionResponse<Course>> {
   try {
     const validated = courseSchema.safeParse(rawInput);
@@ -81,15 +82,16 @@ export async function createCourseAction(
 
     revalidatePath("/dashboard");
     return { success: true, data: data as Course };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Failed to create course." };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to create course.";
+    return { success: false, error: message };
   }
 }
 
 // Update a course
 export async function updateCourseAction(
   id: string,
-  rawInput: any
+  rawInput: CourseInput
 ): Promise<ActionResponse<Course>> {
   try {
     const validated = courseSchema.safeParse(rawInput);
@@ -127,8 +129,9 @@ export async function updateCourseAction(
     revalidatePath("/dashboard");
     revalidatePath(`/courses/${id}`);
     return { success: true, data: data as Course };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Failed to update course." };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to update course.";
+    return { success: false, error: message };
   }
 }
 
@@ -156,8 +159,9 @@ export async function deleteCourseAction(
 
     revalidatePath("/dashboard");
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Failed to delete course." };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to delete course.";
+    return { success: false, error: message };
   }
 }
 
@@ -185,7 +189,8 @@ export async function getCourseByIdAction(
     }
 
     return { success: true, data: data as Course };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Failed to retrieve course details." };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to retrieve course details.";
+    return { success: false, error: message };
   }
 }

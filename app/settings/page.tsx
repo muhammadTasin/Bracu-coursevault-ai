@@ -31,15 +31,19 @@ export default function SettingsPage() {
       } else {
         setErrorMsg(res.error || "Failed to retrieve your profile settings.");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "An unexpected error occurred.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setErrorMsg(message);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadProfile();
+    const timer = setTimeout(() => {
+      loadProfile();
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -57,8 +61,9 @@ export default function SettingsPage() {
       } else {
         setErrorMsg(res.error || "Failed to update profile details.");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to save profile.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save profile.";
+      setErrorMsg(message);
     } finally {
       setSavingProfile(false);
     }

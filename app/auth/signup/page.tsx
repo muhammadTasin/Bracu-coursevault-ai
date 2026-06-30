@@ -4,12 +4,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-
 import { signupAction } from "@/lib/actions/auth";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,8 +28,9 @@ export default function SignupPage() {
       if (res && !res.success) {
         setErrorMsg(res.error || "Failed to create account.");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Sign up failed.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Sign up failed.";
+      setErrorMsg(message);
     } finally {
       setLoading(false);
     }

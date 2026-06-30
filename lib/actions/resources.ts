@@ -1,11 +1,11 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { resourceSchema } from "@/lib/validation";
+import { resourceSchema, ResourceInput } from "@/lib/validation";
 import { Resource } from "@/types";
 import { revalidatePath } from "next/cache";
 
-export interface ActionResponse<T = any> {
+export interface ActionResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -35,15 +35,16 @@ export async function getResourcesAction(
     }
 
     return { success: true, data: data as Resource[] };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Failed to retrieve resources." };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to retrieve resources.";
+    return { success: false, error: message };
   }
 }
 
 // Add resource link under a course
 export async function addResourceAction(
   courseId: string,
-  rawInput: any
+  rawInput: ResourceInput
 ): Promise<ActionResponse<Resource>> {
   try {
     const validated = resourceSchema.safeParse(rawInput);
@@ -81,8 +82,9 @@ export async function addResourceAction(
 
     revalidatePath(`/courses/${courseId}`);
     return { success: true, data: data as Resource };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Failed to save resource." };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to save resource.";
+    return { success: false, error: message };
   }
 }
 
@@ -111,7 +113,8 @@ export async function deleteResourceAction(
 
     revalidatePath(`/courses/${courseId}`);
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Failed to delete resource." };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to delete resource.";
+    return { success: false, error: message };
   }
 }

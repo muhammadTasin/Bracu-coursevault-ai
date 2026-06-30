@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Profile } from "@/types";
 import { revalidatePath } from "next/cache";
 
-export interface ActionResponse<T = any> {
+export interface ActionResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -30,8 +30,9 @@ export async function getProfileAction(): Promise<ActionResponse<Profile>> {
     }
 
     return { success: true, data: data as Profile };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Failed to load profile." };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to load profile.";
+    return { success: false, error: message };
   }
 }
 
@@ -63,7 +64,8 @@ export async function updateProfileAction(
 
     revalidatePath("/settings");
     return { success: true, data: data as Profile };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Failed to update profile." };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to update profile.";
+    return { success: false, error: message };
   }
 }

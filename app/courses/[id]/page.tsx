@@ -56,34 +56,47 @@ export default function CourseDetail({ params }: PageProps) {
   const [aiStatusMessage, setAiStatusMessage] = useState("Scan complete.");
 
   // Fetch course and its resources
-  const loadData = async () => {
-    setLoading(true);
-    setErrorMsg("");
-    try {
-      const courseRes = await getCourseByIdAction(courseId);
-      if (courseRes.success && courseRes.data) {
-        setCourse(courseRes.data);
-      } else {
-        setErrorMsg(courseRes.error || "Failed to load course folder details.");
-        setLoading(false);
-        return;
-      }
-
-      const resourcesRes = await getResourcesAction(courseId);
-      if (resourcesRes.success && resourcesRes.data) {
-        setResources(resourcesRes.data);
-      } else {
-        setErrorMsg(resourcesRes.error || "Failed to load resource links.");
-      }
-    } catch (err: any) {
-      setErrorMsg(err.message || "An unexpected error occurred.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadData();
+    let active = true;
+
+    const loadData = async () => {
+      setLoading(true);
+      setErrorMsg("");
+      try {
+        const courseRes = await getCourseByIdAction(courseId);
+        if (!active) return;
+        if (courseRes.success && courseRes.data) {
+          setCourse(courseRes.data);
+        } else {
+          setErrorMsg(courseRes.error || "Failed to load course folder details.");
+          setLoading(false);
+          return;
+        }
+
+        const resourcesRes = await getResourcesAction(courseId);
+        if (!active) return;
+        if (resourcesRes.success && resourcesRes.data) {
+          setResources(resourcesRes.data);
+        } else {
+          setErrorMsg(resourcesRes.error || "Failed to load resource links.");
+        }
+      } catch (err) {
+        if (!active) return;
+        const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+        setErrorMsg(message);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      loadData();
+    }, 0);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, [courseId]);
 
   const triggerAIScan = () => {
@@ -123,9 +136,11 @@ export default function CourseDetail({ params }: PageProps) {
       } else {
         setErrorMsg(res.error || "Failed to save link.");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to add resource.");
-    } finally {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to add resource.";
+      setErrorMsg(message);
+    } // Typo fixed below
+    finally {
       setSubmitting(false);
     }
   };
@@ -146,8 +161,9 @@ export default function CourseDetail({ params }: PageProps) {
       } else {
         setErrorMsg(res.error || "Failed to delete link.");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to delete resource.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to delete resource.";
+      setErrorMsg(message);
     }
   };
 
@@ -178,8 +194,9 @@ export default function CourseDetail({ params }: PageProps) {
       } else {
         setErrorMsg(res.error || "Failed to add suggested resource.");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to add suggestion.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to add suggestion.";
+      setErrorMsg(message);
     }
   };
 
