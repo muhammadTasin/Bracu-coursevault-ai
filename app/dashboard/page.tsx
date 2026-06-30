@@ -24,6 +24,11 @@ export default function Dashboard() {
   const [courseDesc, setCourseDesc] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // AI autofill states
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiTags, setAiTags] = useState<string[]>([]);
+  const [aiTopics, setAiTopics] = useState<string[]>([]);
+
   // Fetch courses from database
   const loadCourses = async () => {
     setLoading(true);
@@ -50,6 +55,40 @@ export default function Dashboard() {
     return () => clearTimeout(timer);
   }, []);
 
+  const handleAutofillWithAI = async () => {
+    if (!courseCode.trim()) {
+      alert("Please enter a course code or topic search query first (e.g., cse427 or machine learning).");
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const res = await fetch("/api/ai/suggest", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: courseCode }),
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setCourseCode(data.data.courseCode || courseCode);
+        setCourseTitle(data.data.courseTitle || "");
+        setCourseDesc(data.data.description || "");
+        
+        const subjectPrefix = data.data.courseCode.split(" ")[0] || "CSE";
+        setAiTags([subjectPrefix]);
+        setAiTopics(data.data.topics || []);
+      } else {
+        alert(data.error || "AI could not generate suggestions. Using generic fallback.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to connect to AI server. Please check settings.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleAddCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!courseCode.trim() || !courseTitle.trim()) return;
@@ -59,10 +98,14 @@ export default function Dashboard() {
     setSuccessMsg("");
 
     try {
+      // Pass both subject prefixes and specific topics as searchable database tags
+      const mergedTags = Array.from(new Set([...aiTags, ...aiTopics]));
+      
       const res = await createCourseAction({
         course_code: courseCode,
         course_title: courseTitle,
         description: courseDesc,
+        tags: mergedTags
       });
 
       if (res.success && res.data) {
@@ -71,6 +114,8 @@ export default function Dashboard() {
         setCourseCode("");
         setCourseTitle("");
         setCourseDesc("");
+        setAiTags([]);
+        setAiTopics([]);
         setIsModalOpen(false);
         setTimeout(() => setSuccessMsg(""), 4000);
       } else {
@@ -106,6 +151,15 @@ export default function Dashboard() {
     }
   };
 
+  const openNewCourseModal = () => {
+    setCourseCode("");
+    setCourseTitle("");
+    setCourseDesc("");
+    setAiTags([]);
+    setAiTopics([]);
+    setIsModalOpen(true);
+  };
+
   return (
     <main className="flex-1 pt-32 pb-24 px-4 md:px-12 max-w-[1440px] mx-auto w-full flex flex-col gap-10 relative z-10">
       
@@ -120,7 +174,7 @@ export default function Dashboard() {
           </p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openNewCourseModal}
           className="btn-primary py-2.5 px-6 self-start text-sm shadow-md"
         >
           <span className="material-symbols-outlined font-bold text-lg">add</span>
@@ -168,7 +222,7 @@ export default function Dashboard() {
             </p>
           </div>
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={openNewCourseModal}
             className="btn-primary py-2.5 px-6 text-sm"
           >
             Create Your First Course
@@ -214,12 +268,17 @@ export default function Dashboard() {
               </div>
 
               <div className="relative z-10 pt-4 border-t border-white/10 mt-6 flex items-center justify-between">
-                <div className="flex gap-2">
-                  {course.tags && course.tags.map((tag) => (
-                    <span key={tag} className="glass-chip text-[10px] px-2 py-0.5 border-none bg-white/5">
+                <div className="flex flex-wrap gap-1 max-w-[70%]">
+                  {course.tags && course.tags.slice(0, 3).map((tag) => (
+                    <span key={tag} className="glass-chip text-[9px] px-2 py-0.5 border-none bg-white/5 whitespace-nowrap overflow-hidden text-ellipsis max-w-[80px]">
                       {tag}
                     </span>
                   ))}
+                  {course.tags && course.tags.length > 3 && (
+                    <span className="text-[9px] text-white/40 font-mono self-center">
+                      +{course.tags.length - 3}
+                    </span>
+                  )}
                 </div>
                 <span className="btn-primary py-1.5 px-4 text-xs shadow-none gap-1 bg-gradient-to-r from-[#7c3aed] to-[#94e2ff] text-[#060d20]">
                   Open Folder
@@ -231,7 +290,7 @@ export default function Dashboard() {
 
           {/* Add Course Trigger card */}
           <div
-            onClick={() => setIsModalOpen(true)}
+            onClick={openNewCourseModal}
             className="bento-card bento-card-hover border-dashed border-2 border-white/20 hover:border-[#7c3aed]/50 flex flex-col items-center justify-center gap-4 text-center cursor-pointer bg-white/5 group min-h-[250px]"
           >
             <div className="w-12 h-12 rounded-full bg-[#7c3aed]/10 flex items-center justify-center border border-[#7c3aed]/30 group-hover:bg-[#7c3aed]/20 transition-all">
@@ -248,14 +307,14 @@ export default function Dashboard() {
 
       {/* Add Course Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div
             className="absolute inset-0 bg-[#060d20]/80 backdrop-blur-md transition-opacity"
             onClick={() => {
-              if (!submitting) setIsModalOpen(false);
+              if (!submitting && !aiLoading) setIsModalOpen(false);
             }}
           />
-          <div className="glass-panel rounded-2xl w-full max-w-md p-6 md:p-8 relative z-10 border border-white/20 shadow-2xl animate-in fade-in zoom-in duration-300">
+          <div className="glass-panel rounded-2xl w-full max-w-md p-6 md:p-8 relative z-10 border border-white/20 shadow-2xl animate-in zoom-in duration-300">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#d2bbff]">create_new_folder</span>
@@ -263,7 +322,7 @@ export default function Dashboard() {
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                disabled={submitting}
+                disabled={submitting || aiLoading}
                 className="text-white/60 hover:text-white transition-colors cursor-pointer disabled:opacity-40"
               >
                 <span className="material-symbols-outlined">close</span>
@@ -273,17 +332,28 @@ export default function Dashboard() {
             <form onSubmit={handleAddCourse} className="flex flex-col gap-4">
               <div>
                 <label className="block text-xs font-mono uppercase tracking-wider text-[#ccc3d8] mb-2">
-                  Course Code *
+                  Course Code or Search Term *
                 </label>
-                <input
-                  type="text"
-                  required
-                  disabled={submitting}
-                  placeholder="e.g. CSE 427"
-                  value={courseCode}
-                  onChange={(e) => setCourseCode(e.target.value)}
-                  className="input-glass disabled:opacity-50"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    disabled={submitting || aiLoading}
+                    placeholder="e.g. cse427 or machine learning"
+                    value={courseCode}
+                    onChange={(e) => setCourseCode(e.target.value)}
+                    className="input-glass flex-1 disabled:opacity-50"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAutofillWithAI}
+                    disabled={aiLoading || submitting}
+                    className="btn-secondary py-2 px-3 text-xs bg-[#7c3aed]/10 border-[#7c3aed]/40 hover:bg-[#7c3aed]/20 text-[#d2bbff] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-sm animate-pulse">auto_awesome</span>
+                    {aiLoading ? "Consulting AI..." : "Create with AI"}
+                  </button>
+                </div>
               </div>
               
               <div>
@@ -293,7 +363,7 @@ export default function Dashboard() {
                 <input
                   type="text"
                   required
-                  disabled={submitting}
+                  disabled={submitting || aiLoading}
                   placeholder="e.g. Machine Learning"
                   value={courseTitle}
                   onChange={(e) => setCourseTitle(e.target.value)}
@@ -307,7 +377,7 @@ export default function Dashboard() {
                 </label>
                 <textarea
                   placeholder="Brief summary of syllabus or targets..."
-                  disabled={submitting}
+                  disabled={submitting || aiLoading}
                   value={courseDesc}
                   onChange={(e) => setCourseDesc(e.target.value)}
                   rows={3}
@@ -315,18 +385,33 @@ export default function Dashboard() {
                 />
               </div>
 
+              {aiTopics.length > 0 && (
+                <div className="p-3 rounded-lg bg-[#7c3aed]/5 border border-[#7c3aed]/20">
+                  <span className="text-[10px] font-mono text-[#d2bbff] uppercase tracking-wider block mb-1.5">
+                    AI Suggested Syllabus Topics:
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {aiTopics.map((topic) => (
+                      <span key={topic} className="text-[9px] bg-white/5 text-white/80 px-2 py-0.5 rounded border border-white/5">
+                        {topic}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-3 mt-4">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  disabled={submitting}
+                  disabled={submitting || aiLoading}
                   className="btn-secondary py-2.5 px-4 text-sm flex-1 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || aiLoading}
                   className="btn-primary py-2.5 px-4 text-sm flex-1 disabled:opacity-55"
                 >
                   {submitting ? "Initializing..." : "Create Folder"}
