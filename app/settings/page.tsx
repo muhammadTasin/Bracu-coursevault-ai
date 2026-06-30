@@ -226,14 +226,18 @@ export default function SettingsPage() {
             <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
               <span className="material-symbols-outlined text-2xl animate-pulse">lock_open</span>
               <div>
-                <h3 className="font-bold text-sm text-white">AI Resource Finder: Connected</h3>
-                <p className="text-xs text-emerald-400/80 mt-0.5">Gemini primary + OpenRouter fallback active</p>
+                <h3 className="font-bold text-sm text-white">AI Resource Finder: Server Connected</h3>
+                <p className="text-xs text-emerald-400/80 mt-0.5">Mode: Gemini primary + OpenRouter fallback</p>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-[#171f33]/40 border border-white/5">
-              <p className="text-xs text-[#ccc3d8]/80 leading-relaxed">
-                Keys are stored securely on the server and never exposed to the browser.
+            <div className="p-4 rounded-xl bg-[#171f33]/40 border border-white/5 flex flex-col gap-3">
+              <p className="text-xs text-[#ccc3d8] leading-relaxed">
+                <strong className="text-white block mb-0.5">Purpose:</strong>
+                Auto-normalizes BRACU course codes, suggests latest course title, topics, and resources.
+              </p>
+              <p className="text-[11px] text-[#ccc3d8]/70 leading-relaxed italic border-t border-white/5 pt-2">
+                Security: API keys are stored securely on the server and never exposed to the browser.
               </p>
             </div>
           </div>
